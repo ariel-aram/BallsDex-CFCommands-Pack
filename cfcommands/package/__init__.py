@@ -6,8 +6,10 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("ballsdex.packages.cfcommands")
 
-async def setup(bot: BallsDexBot):
+
+async def setup(bot: "BallsDexBot"):
     log.info("Loading CFCommands package...")
     from .cog import CFCommands
+
     await bot.add_cog(CFCommands(bot))
     log.info("CFCommands package loaded successfully!")
