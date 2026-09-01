@@ -3,19 +3,53 @@ from typing import TYPE_CHECKING
 import discord
 from discord import app_commands
 from discord.ext import commands
-from ballsdex.core.utils.transformers import BallTransformer
+from ballsdex.core.utils.transformers import BallEnabledTransform
 from bd_models.models import Ball
+from settings.models import settings
 
 if TYPE_CHECKING:
     from ballsdex.core.bot import BallsDexBot
 
+
 class CFCommands(commands.Cog):
     def __init__(self, bot: "BallsDexBot"):
         self.bot = bot
+        self._inspect_command: app_commands.Command | None = None
 
-    @app_commands.command()
+    async def cog_load(self):
+        balls_group_name = getattr(settings, "balls_slash_name", "balls")
+        balls_group = self.bot.tree.get_command(balls_group_name)
+
+        if isinstance(balls_group, app_commands.Group):
+            self._inspect_command = app_commands.Command(
+                name="inspect",
+                description="Display info from a countryball without having the countryball.",
+                callback=self.inspect,
+            )
+            balls_group.add_command(self._inspect_command)
+        else:
+            self._inspect_command = app_commands.Command(
+                name="inspect",
+                description="Display info from a countryball without having the countryball.",
+                callback=self.inspect,
+            )
+            self.bot.tree.add_command(self._inspect_command)
+
+    async def cog_unload(self):
+        balls_group_name = getattr(settings, "balls_slash_name", "balls")
+        balls_group = self.bot.tree.get_command(balls_group_name)
+
+        if isinstance(balls_group, app_commands.Group):
+            balls_group.remove_command("inspect")
+        else:
+            self.bot.tree.remove_command("inspect")
+
     @app_commands.checks.cooldown(1, 5, key=lambda i: i.user.id)
-    async def inspect(self, interaction: discord.Interaction["BallsDexBot"], countryball: BallEnabledTransform):
+    async def inspect(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        countryball: BallEnabledTransform,
+    ):
         """
         Display info from a countryball without having the countryball.
 
@@ -26,13 +60,15 @@ class CFCommands(commands.Cog):
         """
         await interaction.response.defer(thinking=True)
 
-        ball = await Ball.objects.select_related("regime", "economy").aget(pk=countryball.pk)
+        ball = await Ball.objects.select_related("regime", "economy").aget(
+            pk=countryball.pk
+        )
 
         emoji = self.bot.get_emoji(ball.emoji_id) or ""
 
         regime_name = ball.regime.name if ball.regime else "N/A"
         economy_name = ball.economy.name if ball.economy else "N/A"
-        
+
         embed = discord.Embed(
             title=f"{emoji} {ball.country} Information:",
             description=(
@@ -43,9 +79,9 @@ class CFCommands(commands.Cog):
                 f"⋄ **Health:** {ball.health}\n"
                 f"⋄ **Attack:** {ball.attack}\n"
                 f"⋄ **Rarity:** {ball.rarity}\n"
-                f"⋄ **Ability Name:** {ball.capacity_name}\n"
-                f"⋄ **Ability Description:** {ball.capacity_description}\n"
-                f"⋄ **Artwork Author:** {ball.credits}\n"
+                f"⋄ **Ability Name:** {ball.capacity_name or 'N/A'}\n"
+                f"⋄ **Ability Description:** {ball.capacity_description or 'N/A'}\n"
+                f"⋄ **Artwork Author:** {ball.credits or 'N/A'}\n"
             ),
             color=discord.Color.blurple(),
         )
