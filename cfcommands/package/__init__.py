@@ -6,8 +6,21 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("ballsdex.packages.cfcommands")
 
-async def setup(bot: BallsDexBot):
+async def setup(bot: "BallsDexBot"):
     log.info("Loading CFCommands package...")
     from .cog import CFCommands
-    await bot.add_cog(CFCommands(bot))
+    cog = CFCommands(bot)
+    await bot.add_cog(cog)
+    balls_cog = bot.cogs.get("Balls")
+    if balls_cog is not None:
+        command_group = balls_cog.app_command
+        command_group.command(name="inspect")(cog.cfcommands)
+
     log.info("CFCommands package loaded successfully!")
+
+
+async def teardown(bot: "BallsDexBot"):
+    balls_cog = bot.cogs.get("Balls")
+    if balls_cog is not None:
+        command_group = balls_cog.app_command
+        command_group.remove_command("inspect")
